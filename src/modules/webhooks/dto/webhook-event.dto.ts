@@ -4,16 +4,16 @@ import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
  * Base DTO for receiving Polar webhook events
  * Polar sends webhook data in this format:
  * {
- *   "id": "evt_xxx",
+ *   "id": "evt_xxx",  // Optional - may not be present
  *   "type": "order.paid",
- *   "data": { ... },
- *   "created_at": "2024-01-01T00:00:00Z"
+ *   "timestamp": "2024-01-01T00:00:00Z",
+ *   "data": { ... }
  * }
  */
 export class WebhookEventDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  id: string;
+  id?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -21,6 +21,10 @@ export class WebhookEventDto {
 
   @IsNotEmpty()
   data: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  timestamp?: string;
 
   @IsOptional()
   @IsString()

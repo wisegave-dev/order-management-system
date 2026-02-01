@@ -47,14 +47,43 @@ export class WebhooksController {
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'application/json')
   async receivePolarWebhook(
-    @Body() webhookEvent: WebhookEventDto,
+    @Body() body: any,
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ): Promise<{ received: boolean; eventId: string }> {
     const signature = headers['x-polar-signature'];
 
+    // Log the raw body for debugging
+    this.logger.log(`Raw body type: ${typeof body}`);
+    this.logger.log(`Raw body keys: ${Object.keys(body)}`);
+    this.logger.log(`Raw body: ${JSON.stringify(body)}`);
+
+    // Handle raw payload - Polar sends different formats
+    let webhookEvent: WebhookEventDto;
+
+    // If body is a string (raw), parse it
+    if (typeof body === 'string') {
+      try {
+        webhookEvent = JSON.parse(body);
+      } catch (e) {
+        this.logger.error(`Failed to parse webhook body: ${e.message}`);
+        return {
+          received: false,
+          eventId: 'unknown',
+        };
+      }
+    } else {
+      webhookEvent = body;
+    }
+
+    // Polar doesn't send an event ID, so generate one from type + timestamp + data.id
+    if (!webhookEvent.id) {
+      const dataId = webhookEvent.data?.id || 'unknown';
+      webhookEvent.id = `${webhookEvent.type}_${webhookEvent.timestamp}_${dataId}`;
+    }
+
     this.logger.log(
-      `Webhook received: ${webhookEvent.type} | Event ID: ${webhookEvent.id}`,
+      `Webhook received: ${webhookEvent?.type} | Event ID: ${webhookEvent?.id}`,
     );
 
     if (signature) {
@@ -68,7 +97,7 @@ export class WebhooksController {
       // Return 200 OK to acknowledge receipt
       return {
         received: true,
-        eventId: webhookEvent.id,
+        eventId: webhookEvent?.id || 'unknown',
       };
     } catch (error) {
       this.logger.error(`Error processing webhook: ${error.message}`);
@@ -77,7 +106,7 @@ export class WebhooksController {
       // The webhook is saved with FAILED status
       return {
         received: true,
-        eventId: webhookEvent.id,
+        eventId: webhookEvent?.id || 'unknown',
       };
     }
   }
