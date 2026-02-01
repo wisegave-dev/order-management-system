@@ -5,6 +5,7 @@ import { ConfigModule as AppConfigModule } from './modules/config/config.module'
 import { DatabaseModule } from './modules/database/database.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     DatabaseModule,
     CustomersModule,
     OrdersModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -24,6 +24,9 @@ export class Customer extends BaseEntity {
   @Column({ type: 'varchar', length: 100, name: 'timezone', default: 'America/New_York' })
   timezone: string;
 
+  @Column({ type: 'json', name: 'metadata', nullable: true })
+  metadata: Record<string, any>;
+
   @OneToMany(() => Order, (order) => order.customer)
   orders: Order[];
 }

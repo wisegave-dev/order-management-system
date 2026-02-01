@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "ts-node src/main.ts",
-    "start:dev": "ts-node --watch src/main.ts"
+    "start:dev": "ts-node --watch src/main.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.12",

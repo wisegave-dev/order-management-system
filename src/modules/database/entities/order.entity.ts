@@ -37,6 +37,10 @@ export class Order extends BaseEntity {
   @Column({ type: 'varchar', length: 255, name: 'polar_checkout_id', nullable: true })
   polarCheckoutId: string;
 
+  @Column({ type: 'varchar', length: 255, name: 'polar_subscription_id', nullable: true })
+  @Index()
+  polarSubscriptionId: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'amount', nullable: true })
   amount: number;
 
