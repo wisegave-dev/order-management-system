@@ -214,85 +214,26 @@ export class WebhooksService {
   private async handleSubscriptionCreated(data: any): Promise<any> {
     this.logger.log(`Subscription created: ${data.id}`);
 
-    // Find or create order for this subscription
-    let order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (!order) {
-      // Find customer
-      const customer = await this.findOrCreateCustomer(data.customer_id);
-
-      // Create order for subscription
-      order = this.orderRepository.create({
-        customerId: customer.id,
-        polarProductId: data.product_id,
-        polarCheckoutId: data.id,
-        amount: data.amount,
-        currency: data.currency,
-        status: OrderStatus.PENDING,
-        metadata: {
-          subscription_id: data.id,
-          recurring_interval: data.recurring_interval,
-          current_period_start: data.current_period_start,
-          current_period_end: data.current_period_end,
-        },
-      });
-      await this.orderRepository.save(order);
-      this.logger.log(`Order created for subscription: ${order.id}`);
-    }
-
-    return { orderId: order.id, subscriptionId: data.id };
+    // Don't create orders here - orders are created by order.created webhook
+    // Just store subscription metadata for reference
+    return {
+      subscriptionId: data.id,
+      message: 'Subscription recorded, order will be created by order.created webhook',
+    };
   }
 
   private async handleSubscriptionUpdated(data: any): Promise<any> {
     this.logger.log(`Subscription updated: ${data.id}`);
-
-    const order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (order) {
-      order.metadata = {
-        ...order.metadata,
-        current_period_start: data.current_period_start,
-        current_period_end: data.current_period_end,
-        cancel_at_period_end: data.cancel_at_period_end,
-      };
-      await this.orderRepository.save(order);
-    }
-
     return { subscriptionId: data.id, updated: true };
   }
 
   private async handleSubscriptionActive(data: any): Promise<any> {
     this.logger.log(`Subscription active: ${data.id}`);
-
-    const order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (order) {
-      order.status = OrderStatus.COMPLETED;
-      await this.orderRepository.save(order);
-    }
-
     return { subscriptionId: data.id, status: 'active' };
   }
 
   private async handleSubscriptionCanceled(data: any): Promise<any> {
     this.logger.log(`Subscription canceled: ${data.id}`);
-
-    const order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (order) {
-      order.status = OrderStatus.FAILED;
-      order.notes = 'Subscription canceled';
-      await this.orderRepository.save(order);
-    }
-
     return { subscriptionId: data.id, status: 'canceled' };
   }
 
@@ -303,33 +244,11 @@ export class WebhooksService {
 
   private async handleSubscriptionRevoked(data: any): Promise<any> {
     this.logger.log(`Subscription revoked: ${data.id}`);
-
-    const order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (order) {
-      order.status = OrderStatus.FAILED;
-      order.notes = 'Subscription revoked';
-      await this.orderRepository.save(order);
-    }
-
     return { subscriptionId: data.id, status: 'revoked' };
   }
 
   private async handleSubscriptionPastDue(data: any): Promise<any> {
     this.logger.log(`Subscription past due: ${data.id}`);
-
-    const order = await this.orderRepository.findOne({
-      where: { polarCheckoutId: data.id },
-    });
-
-    if (order) {
-      order.status = OrderStatus.PROCESSING;
-      order.notes = 'Payment past due';
-      await this.orderRepository.save(order);
-    }
-
     return { subscriptionId: data.id, status: 'past_due' };
   }
 
@@ -344,10 +263,16 @@ export class WebhooksService {
       customerId: customer.id,
       polarProductId: data.product_id,
       polarCheckoutId: data.id,
+      polarSubscriptionId: data.subscription_id || null,
       amount: data.amount,
       currency: data.currency,
       status: OrderStatus.PENDING,
-      metadata: data.metadata || {},
+      metadata: {
+        ...data.metadata,
+        checkout_id: data.checkout_id,
+        subscription_id: data.subscription_id,
+        custom_field_data: data.custom_field_data,
+      },
     });
 
     await this.orderRepository.save(order);
@@ -363,7 +288,11 @@ export class WebhooksService {
     });
 
     if (order) {
-      order.metadata = { ...order.metadata, ...data.metadata };
+      order.metadata = {
+        ...order.metadata,
+        ...data.metadata,
+        subscription_id: data.subscription_id,
+      };
       await this.orderRepository.save(order);
     }
 
@@ -381,6 +310,14 @@ export class WebhooksService {
       order.status = OrderStatus.COMPLETED;
       order.amount = data.amount;
       order.currency = data.currency;
+      // Update subscription info if available
+      if (data.subscription_id && !order.polarSubscriptionId) {
+        order.polarSubscriptionId = data.subscription_id;
+        order.metadata = {
+          ...order.metadata,
+          subscription_id: data.subscription_id,
+        };
+      }
       await this.orderRepository.save(order);
       this.logger.log(`Order marked as completed: ${order.id}`);
     }
