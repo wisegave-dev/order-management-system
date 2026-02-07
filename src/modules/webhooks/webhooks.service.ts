@@ -427,7 +427,7 @@ export class WebhooksService {
     // Try to find existing customer by searching metadata using QueryBuilder
     const customer = await this.customerRepository
       .createQueryBuilder('customer')
-      .where("JSON_EXTRACT(customer.metadata, '$.polar_customer_id') = :id", {
+      .where("customer.metadata->>'polar_customer_id' = :id", {
         id: polarCustomerId,
       })
       .getOne();

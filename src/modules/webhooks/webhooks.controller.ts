@@ -10,11 +10,11 @@ import {
   Header,
   Req,
   Headers,
-} from '@nestjs/common';
-import { Request } from 'express';
-import { WebhooksService } from './webhooks.service';
-import { WebhookEventDto } from './dto/webhook-event.dto';
-import { PolarWebhookEventType } from '../database/entities/webhook.entity';
+} from "@nestjs/common";
+import { Request } from "express";
+import { WebhooksService } from "./webhooks.service";
+import { WebhookEventDto } from "./dto/webhook-event.dto";
+import { PolarWebhookEventType } from "../database/entities/webhook.entity";
 
 /**
  * Webhook Controller for receiving Polar webhook events
@@ -22,7 +22,7 @@ import { PolarWebhookEventType } from '../database/entities/webhook.entity';
  * Polar will send POST requests to this endpoint with event data
  * Endpoint: POST /webhooks/polar
  */
-@Controller('webhooks')
+@Controller("webhooks")
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
@@ -43,15 +43,15 @@ export class WebhooksController {
    * Polar sends signature in header: X-Polar-Signature
    * Format: t=123456,v1=abcdef...
    */
-  @Post('polar')
+  @Post("polar")
   @HttpCode(HttpStatus.OK)
-  @Header('Content-Type', 'application/json')
+  @Header("Content-Type", "application/json")
   async receivePolarWebhook(
     @Body() body: any,
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ): Promise<{ received: boolean; eventId: string }> {
-    const signature = headers['x-polar-signature'];
+    const signature = headers["x-polar-signature"];
 
     // Log the raw body for debugging
     this.logger.log(`Raw body type: ${typeof body}`);
@@ -62,14 +62,14 @@ export class WebhooksController {
     let webhookEvent: WebhookEventDto;
 
     // If body is a string (raw), parse it
-    if (typeof body === 'string') {
+    if (typeof body === "string") {
       try {
         webhookEvent = JSON.parse(body);
       } catch (e) {
         this.logger.error(`Failed to parse webhook body: ${e.message}`);
         return {
           received: false,
-          eventId: 'unknown',
+          eventId: "unknown",
         };
       }
     } else {
@@ -78,13 +78,15 @@ export class WebhooksController {
 
     // Polar doesn't send an event ID, so generate one from type + timestamp + data.id
     if (!webhookEvent.id) {
-      const dataId = webhookEvent.data?.id || 'unknown';
+      const dataId = webhookEvent.data?.id || "unknown";
       webhookEvent.id = `${webhookEvent.type}_${webhookEvent.timestamp}_${dataId}`;
     }
 
     this.logger.log(
       `Webhook received: ${webhookEvent?.type} | Event ID: ${webhookEvent?.id}`,
     );
+
+    this.logger.log(`Webhook data: ${JSON.stringify(webhookEvent.data)}`);
 
     if (signature) {
       this.logger.debug(`Signature present: ${signature.substring(0, 20)}...`);
@@ -97,7 +99,7 @@ export class WebhooksController {
       // Return 200 OK to acknowledge receipt
       return {
         received: true,
-        eventId: webhookEvent?.id || 'unknown',
+        eventId: webhookEvent?.id || "unknown",
       };
     } catch (error) {
       this.logger.error(`Error processing webhook: ${error.message}`);
@@ -106,7 +108,7 @@ export class WebhooksController {
       // The webhook is saved with FAILED status
       return {
         received: true,
-        eventId: webhookEvent?.id || 'unknown',
+        eventId: webhookEvent?.id || "unknown",
       };
     }
   }
@@ -122,16 +124,16 @@ export class WebhooksController {
   /**
    * Get webhook by ID
    */
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
+  @Get(":id")
+  async findOne(@Param("id") id: string) {
     return this.webhooksService.findOne(id);
   }
 
   /**
    * Get webhooks by event type
    */
-  @Get('type/:eventType')
-  async findByEventType(@Param('eventType') eventType: PolarWebhookEventType) {
+  @Get("type/:eventType")
+  async findByEventType(@Param("eventType") eventType: PolarWebhookEventType) {
     return this.webhooksService.findByEventType(eventType);
   }
 }

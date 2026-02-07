@@ -12,8 +12,8 @@ export enum OrderStatus {
 
 @Entity('orders')
 export class Order extends BaseEntity {
-  @Column({ type: 'varchar', length: 255, name: 'customer_id' })
   @Index()
+  @Column({ name: 'customer_id' })
   customerId: string;
 
   @ManyToOne(() => Customer, (customer) => customer.orders, {

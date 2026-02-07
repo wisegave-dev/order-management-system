@@ -3,17 +3,36 @@ services:
   - type: web
     name: order-management-system
     runtime: node
-    buildCommand: npm install
+    buildCommand: npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
+      - key: DB_HOST
+        fromDatabase:
+          name: order-management-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: order-management-db
+          property: port
+      - key: DB_USERNAME
+        fromDatabase:
+          name: order-management-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: order-management-db
+          property: password
+      - key: DB_DATABASE
+        fromDatabase:
+          name: order-management-db
+          property: database
     healthCheckPath: /health
 
-  # PostgreSQL Database (if you want to use Render's database)
-  # - type: pserv
-  #   name: order-management-db
-  #   databaseName: order_management
-  #   user: order_user
+databases:
+  # PostgreSQL Database (Render's free tier)
+  - name: order-management-db
+    databaseName: order_management

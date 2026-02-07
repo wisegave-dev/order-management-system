@@ -28,7 +28,7 @@ export class ConfigService {
   }
 
   get dbPort(): number {
-    return this.configService.get<number>('DB_PORT', 3306);
+    return this.configService.get<number>('DB_PORT', 5432);
   }
 
   get dbUsername(): string {

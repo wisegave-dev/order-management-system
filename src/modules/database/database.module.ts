@@ -10,7 +10,7 @@ import { ConfigService } from '../config/config.service';
       imports: [NestConfigModule, ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        type: 'mysql',
+        type: 'postgres',
         host: configService.dbHost,
         port: configService.dbPort,
         username: configService.dbUsername,
@@ -19,10 +19,8 @@ import { ConfigService } from '../config/config.service';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: configService.nodeEnv === 'development',
         logging: configService.nodeEnv === 'development',
-        timezone: '+00:00', // Store timestamps in UTC
-        charset: 'utf8mb4',
         extra: {
-          connectionLimit: 10,
+          max: 10,
         },
       }),
     }),
