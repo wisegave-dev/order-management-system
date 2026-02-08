@@ -80,6 +80,14 @@ export class ConfigService {
     return id;
   }
 
+  get ghlCompanyId(): string {
+    const id = this.configService.get<string>('GHL_COMPANY_ID', '');
+    if (!id && this.nodeEnv === 'production') {
+      throw new Error('GHL_COMPANY_ID is required in production but not defined');
+    }
+    return id;
+  }
+
   get ghlDefaultSnapshotId(): string {
     return this.configService.get<string>('GHL_SNAPSHOT_ID', '');
   }

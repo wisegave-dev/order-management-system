@@ -6,6 +6,7 @@ import { DatabaseModule } from './modules/database/database.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { GhlModule } from './modules/ghl/ghl.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     CustomersModule,
     OrdersModule,
     WebhooksModule,
+    GhlModule,
   ],
   controllers: [AppController],
   providers: [],

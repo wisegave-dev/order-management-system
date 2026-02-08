@@ -5,6 +5,7 @@ import { Webhook, WebhookStatus, PolarWebhookEventType } from '../database/entit
 import { Order, OrderStatus } from '../database/entities/order.entity';
 import { Customer } from '../database/entities/customer.entity';
 import { WebhookEventDto, PolarCustomer, PolarSubscription, PolarOrder, PolarRefund } from './dto/webhook-event.dto';
+import { GhlService } from '../ghl/ghl.service';
 
 @Injectable()
 export class WebhooksService {
@@ -17,6 +18,7 @@ export class WebhooksService {
     private orderRepository: Repository<Order>,
     @InjectRepository(Customer)
     private customerRepository: Repository<Customer>,
+    private ghlService: GhlService,
   ) {}
 
   /**
@@ -163,13 +165,21 @@ export class WebhooksService {
     });
 
     if (!customer) {
+      // Extract name from custom_field_data if available (Polar checkout custom fields)
+      const firstName = data.custom_field_data?.first_name || data.name?.split(' ')[0] || '';
+      const lastName = data.custom_field_data?.last_name || data.name?.split(' ').slice(1).join(' ') || '';
+      const phone = data.custom_field_data?.phone || null;
+
       // Create new customer
       customer = this.customerRepository.create({
-        firstName: data.name?.split(' ')[0] || '',
-        lastName: data.name?.split(' ').slice(1).join(' ') || data.name || '',
+        firstName,
+        lastName,
         email: data.email,
         businessName: data.billing_address?.organization || '',
-        metadata: { polar_customer_id: data.id },
+        metadata: {
+          polar_customer_id: data.id,
+          phone,
+        },
       });
       await this.customerRepository.save(customer);
       this.logger.log(`New customer created: ${customer.id}`);
@@ -306,23 +316,102 @@ export class WebhooksService {
       where: { polarCheckoutId: data.id },
     });
 
-    if (order) {
-      order.status = OrderStatus.COMPLETED;
-      order.amount = data.amount;
-      order.currency = data.currency;
-      // Update subscription info if available
-      if (data.subscription_id && !order.polarSubscriptionId) {
-        order.polarSubscriptionId = data.subscription_id;
-        order.metadata = {
-          ...order.metadata,
-          subscription_id: data.subscription_id,
-        };
-      }
-      await this.orderRepository.save(order);
-      this.logger.log(`Order marked as completed: ${order.id}`);
+    if (!order) {
+      this.logger.warn(`Order not found for Polar order ID: ${data.id}`);
+      return { polarOrderId: data.id, status: 'paid', orderCreated: false };
     }
 
-    return { orderId: order?.id, polarOrderId: data.id, status: 'paid' };
+    // Update order details
+    order.status = OrderStatus.COMPLETED;
+    order.amount = data.amount;
+    order.currency = data.currency;
+
+    // Update subscription info if available
+    if (data.subscription_id && !order.polarSubscriptionId) {
+      order.polarSubscriptionId = data.subscription_id;
+    }
+
+    // Store custom_field_data in order metadata
+    if (data.custom_field_data) {
+      order.metadata = {
+        ...order.metadata,
+        subscription_id: data.subscription_id,
+        custom_field_data: data.custom_field_data,
+      };
+    }
+
+    await this.orderRepository.save(order);
+    this.logger.log(`Order marked as completed: ${order.id}`);
+
+    // Get customer details
+    const customer = await this.customerRepository.findOne({
+      where: { id: order.customerId },
+    });
+
+    if (customer) {
+      // Update customer with data from custom_field_data
+      let customerUpdated = false;
+
+      if (data.custom_field_data) {
+        if (data.custom_field_data.first_name) {
+          customer.firstName = data.custom_field_data.first_name;
+          customerUpdated = true;
+        }
+        if (data.custom_field_data.last_name) {
+          customer.lastName = data.custom_field_data.last_name;
+          customerUpdated = true;
+        }
+        if (data.custom_field_data.business) {
+          customer.businessName = data.custom_field_data.business;
+          customerUpdated = true;
+        }
+        if (data.custom_field_data.phone) {
+          customer.metadata = {
+            ...customer.metadata,
+            phone: data.custom_field_data.phone,
+          };
+          customerUpdated = true;
+        }
+      }
+
+      // Also update customer email from Polar if different
+      if (data.customer?.email && data.customer.email !== customer.email) {
+        customer.email = data.customer.email;
+        customerUpdated = true;
+      }
+
+      if (customerUpdated) {
+        await this.customerRepository.save(customer);
+        this.logger.log(`Customer updated: ${customer.email}`);
+      }
+
+      // Create GHL account after successful payment
+      this.logger.log(`Creating GHL account for customer: ${customer.email}`);
+
+      try {
+        const ghlResponse = await this.ghlService.createAccountFromOrder(
+          `${customer.firstName} ${customer.lastName}`.trim(),
+          customer.email,
+          customer.metadata?.phone || data.custom_field_data?.phone || null,
+          customer.businessName || data.custom_field_data?.business || null,
+        );
+
+        // Store GHL response in order
+        order.ghlResponse = ghlResponse;
+        await this.orderRepository.save(order);
+
+        if (ghlResponse.success) {
+          this.logger.log(`GHL account created successfully: ${ghlResponse.accountId}`);
+        } else {
+          this.logger.warn(`GHL account creation failed: ${ghlResponse.message}`);
+        }
+      } catch (error) {
+        this.logger.error(`Failed to create GHL account: ${error.message}`);
+        // Don't fail the webhook if GHL account creation fails
+      }
+    }
+
+    return { orderId: order.id, polarOrderId: data.id, status: 'paid' };
   }
 
   private async handleOrderRefunded(data: any): Promise<any> {
