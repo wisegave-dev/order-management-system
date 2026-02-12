@@ -96,8 +96,12 @@ export class GhlService {
 
     // Use business name for the account name, otherwise use person's name
     const accountName = businessName || `${firstName} ${lastName}`.trim();
-    const firstNameForUser = businessName || firstName;
-    const lastNameForUser = lastName || "";
+
+    // For GHL user: if business name exists, use it as firstName with empty lastName
+    // Otherwise use person's firstName and lastName
+    const firstNameForUser = firstName || businessName;
+    const lastNameForUser = lastName || (businessName ? "" : lastName || "");
+
     const password = "WiseGave2026!";
 
     const headers = {
@@ -152,6 +156,11 @@ export class GhlService {
       this.logger.log(
         `Step 1 Success: Location created with ID: ${locationId}`,
       );
+
+      // Add a small delay to ensure GHL has fully propagated the location
+      // GHL API has eventual consistency - the location needs time to be available
+      this.logger.log(`Waiting 2 seconds for GHL to propagate the location...`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // STEP 2: Create User in the new Location
       this.logger.log(`Step 2: Creating user in location: ${locationId}`);
@@ -314,8 +323,12 @@ export class GhlService {
     } = options;
 
     const accountName = businessName || `${firstName} ${lastName}`.trim();
+
+    // For GHL user: if business name exists, use it as firstName with empty lastName
+    // Otherwise use person's firstName and lastName
     const firstNameForUser = businessName || firstName;
-    const lastNameForUser = lastName || "";
+    const lastNameForUser = businessName ? "" : lastName || "";
+
     const password = "WiseGave2026!";
     this.logger.log("LastName", lastNameForUser);
 
@@ -401,5 +414,137 @@ export class GhlService {
         error.response?.status || HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  /**
+   * Delete a user from GHL by user ID
+   */
+  async deleteUser(userId: string): Promise<GhlAccountResponse> {
+    this.logger.log(`Deleting GHL user: ${userId}`);
+
+    try {
+      const headers = {
+        Authorization: `Bearer ${this.configService.ghlApiKey}`,
+        "Content-Type": "application/json",
+        version: "2021-07-28",
+      };
+
+      const response = await firstValueFrom<AxiosResponse<any>>(
+        this.httpService.delete<any>(`/users/${userId}`, {
+          headers,
+        }),
+      );
+
+      this.logger.log(`GHL user deleted successfully: ${userId}`);
+
+      return {
+        success: true,
+        id: userId,
+        message: "User deleted successfully",
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to delete GHL user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      this.logger.error(
+        `Full error response: ${JSON.stringify(error.response?.data || error.response || error)}`,
+      );
+
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message,
+      };
+    }
+  }
+
+  /**
+   * Delete a location/sub-account from GHL by location ID
+   */
+  async deleteLocation(locationId: string): Promise<GhlAccountResponse> {
+    this.logger.log(`Deleting GHL location: ${locationId}`);
+
+    try {
+      const headers = {
+        Authorization: `Bearer ${this.configService.ghlApiKey}`,
+        "Content-Type": "application/json",
+        version: "2021-07-28",
+      };
+
+      const response = await firstValueFrom<AxiosResponse<any>>(
+        this.httpService.delete<any>(`/locations/${locationId}`, {
+          headers,
+        }),
+      );
+
+      this.logger.log(`GHL location deleted successfully: ${locationId}`);
+
+      return {
+        success: true,
+        id: locationId,
+        locationId: locationId,
+        message: "Location deleted successfully",
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to delete GHL location ${locationId}: ${error.message}`,
+        error.stack,
+      );
+      this.logger.error(
+        `Full error response: ${JSON.stringify(error.response?.data || error.response || error)}`,
+      );
+
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message,
+      };
+    }
+  }
+
+  /**
+   * Delete both user and location from GHL
+   * This is the recommended method for subscription cancellation
+   */
+  async deleteAccount(
+    userId: string,
+    locationId: string,
+  ): Promise<GhlAccountResponse> {
+    this.logger.log(
+      `Deleting GHL account - User: ${userId}, Location: ${locationId}`,
+    );
+
+    const results = {
+      userDeleted: false,
+      locationDeleted: false,
+      userError: null as string | null,
+      locationError: null as string | null,
+    };
+
+    // First, delete the user
+    if (userId) {
+      const userResult = await this.deleteUser(userId);
+      results.userDeleted = userResult.success;
+      results.userError = userResult.success ? null : userResult.message;
+    }
+
+    // Then, delete the location
+    if (locationId) {
+      const locationResult = await this.deleteLocation(locationId);
+      results.locationDeleted = locationResult.success;
+      results.locationError = locationResult.success
+        ? null
+        : locationResult.message;
+    }
+
+    const success = results.userDeleted && results.locationDeleted;
+
+    return {
+      success,
+      message: success
+        ? "Account deleted successfully"
+        : `Partial deletion - User: ${results.userDeleted ? "OK" : "Failed"}, Location: ${results.locationDeleted ? "OK" : "Failed"}`,
+      id: userId,
+      locationId: locationId,
+    };
   }
 }

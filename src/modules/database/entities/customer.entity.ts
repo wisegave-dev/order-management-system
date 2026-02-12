@@ -29,4 +29,28 @@ export class Customer extends BaseEntity {
 
   @OneToMany(() => Order, (order) => order.customer)
   orders: Order[];
+
+  // Helper methods for GHL account access (stored in metadata)
+  getGhlAccountId(): string | null {
+    return this.metadata?.ghlAccountId || null;
+  }
+
+  getGhlLocationId(): string | null {
+    return this.metadata?.ghlLocationId || null;
+  }
+
+  setGhlAccount(userId: string, locationId: string): void {
+    this.metadata = {
+      ...this.metadata,
+      ghlAccountId: userId,
+      ghlLocationId: locationId,
+    };
+  }
+
+  clearGhlAccount(): void {
+    if (this.metadata) {
+      delete this.metadata.ghlAccountId;
+      delete this.metadata.ghlLocationId;
+    }
+  }
 }

@@ -244,7 +244,109 @@ export class WebhooksService {
 
   private async handleSubscriptionCanceled(data: any): Promise<any> {
     this.logger.log(`Subscription canceled: ${data.id}`);
-    return { subscriptionId: data.id, status: 'canceled' };
+
+    const subscriptionId = data.id;
+    let ghlAccountId: string | null = null;
+    let ghlLocationId: string | null = null;
+    let orderId: string | null = null;
+    let customerId: string | null = null;
+
+    try {
+      // Find all orders associated with this subscription
+      const orders = await this.orderRepository.find({
+        where: { polarSubscriptionId: subscriptionId },
+      });
+
+      if (orders.length === 0) {
+        this.logger.warn(`No orders found for subscription: ${subscriptionId}`);
+        return { subscriptionId, status: 'canceled', message: 'No orders found' };
+      }
+
+      this.logger.log(`Found ${orders.length} order(s) for subscription: ${subscriptionId}`);
+
+      // Get the customer to check for GHL IDs in metadata
+      const customer = await this.customerRepository.findOne({
+        where: { id: orders[0].customerId },
+      });
+
+      // Process each order (typically there should be only one active order)
+      for (const order of orders) {
+        orderId = order.id;
+        customerId = order.customerId;
+
+        // Get GHL IDs from customer metadata first, then fallback to order
+        ghlAccountId = customer?.getGhlAccountId() || order.ghlAccountId || null;
+        ghlLocationId = customer?.getGhlLocationId() || order.ghlLocationId || null;
+
+        // Update order status to CANCELED
+        order.status = OrderStatus.CANCELED;
+        order.notes = `Subscription canceled: ${subscriptionId}`;
+        order.metadata = {
+          ...order.metadata,
+          subscription_canceled_at: new Date().toISOString(),
+          subscription_cancellation_reason: data.cancellation_reason || 'user_requested',
+        };
+        await this.orderRepository.save(order);
+
+        this.logger.log(`Order ${order.id} marked as CANCELED due to subscription ${subscriptionId}`);
+      }
+
+      // Delete GHL account if it exists
+      if (ghlAccountId || ghlLocationId) {
+        this.logger.log(
+          `Deleting GHL account - User: ${ghlAccountId}, Location: ${ghlLocationId}`,
+        );
+
+        try {
+          const deleteResult = await this.ghlService.deleteAccount(
+            ghlAccountId || '',
+            ghlLocationId || '',
+          );
+
+          // Update orders with deletion result
+          for (const order of orders) {
+            order.ghlResponse = {
+              ...order.ghlResponse,
+              deleted: true,
+              deletedAt: new Date().toISOString(),
+              deletionResult: deleteResult,
+            };
+            await this.orderRepository.save(order);
+          }
+
+          if (deleteResult.success) {
+            this.logger.log(`GHL account deleted successfully for subscription: ${subscriptionId}`);
+
+            // Clear GHL IDs from customer metadata after successful deletion
+            if (customer) {
+              customer.clearGhlAccount();
+              await this.customerRepository.save(customer);
+              this.logger.log(`GHL account IDs cleared from customer metadata: ${customer.email}`);
+            }
+          } else {
+            this.logger.warn(`GHL account deletion failed: ${deleteResult.message}`);
+          }
+        } catch (error: any) {
+          this.logger.error(`Error deleting GHL account: ${error.message}`);
+          // Don't fail the webhook if GHL deletion fails
+        }
+      } else {
+        this.logger.log(`No GHL account found for subscription: ${subscriptionId}`);
+      }
+
+      return {
+        subscriptionId,
+        status: 'canceled',
+        orderId,
+        customerId,
+        ghlAccountId,
+        ghlLocationId,
+        message: 'Subscription canceled and GHL account deleted',
+      };
+    } catch (error: any) {
+      this.logger.error(`Error handling subscription cancellation: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async handleSubscriptionUncanceled(data: any): Promise<any> {
@@ -254,7 +356,109 @@ export class WebhooksService {
 
   private async handleSubscriptionRevoked(data: any): Promise<any> {
     this.logger.log(`Subscription revoked: ${data.id}`);
-    return { subscriptionId: data.id, status: 'revoked' };
+
+    const subscriptionId = data.id;
+    let ghlAccountId: string | null = null;
+    let ghlLocationId: string | null = null;
+    let orderId: string | null = null;
+    let customerId: string | null = null;
+
+    try {
+      // Find all orders associated with this subscription
+      const orders = await this.orderRepository.find({
+        where: { polarSubscriptionId: subscriptionId },
+      });
+
+      if (orders.length === 0) {
+        this.logger.warn(`No orders found for revoked subscription: ${subscriptionId}`);
+        return { subscriptionId, status: 'revoked', message: 'No orders found' };
+      }
+
+      this.logger.log(`Found ${orders.length} order(s) for revoked subscription: ${subscriptionId}`);
+
+      // Get the customer to check for GHL IDs in metadata
+      const customer = await this.customerRepository.findOne({
+        where: { id: orders[0].customerId },
+      });
+
+      // Process each order
+      for (const order of orders) {
+        orderId = order.id;
+        customerId = order.customerId;
+
+        // Get GHL IDs from customer metadata first, then fallback to order
+        ghlAccountId = customer?.getGhlAccountId() || order.ghlAccountId || null;
+        ghlLocationId = customer?.getGhlLocationId() || order.ghlLocationId || null;
+
+        // Update order status to CANCELED
+        order.status = OrderStatus.CANCELED;
+        order.notes = `Subscription revoked: ${subscriptionId}`;
+        order.metadata = {
+          ...order.metadata,
+          subscription_revoked_at: new Date().toISOString(),
+          subscription_revoke_reason: data.revoke_reason || 'system_revoked',
+        };
+        await this.orderRepository.save(order);
+
+        this.logger.log(`Order ${order.id} marked as CANCELED due to subscription revocation ${subscriptionId}`);
+      }
+
+      // Delete GHL account if it exists
+      if (ghlAccountId || ghlLocationId) {
+        this.logger.log(
+          `Deleting GHL account (revoked) - User: ${ghlAccountId}, Location: ${ghlLocationId}`,
+        );
+
+        try {
+          const deleteResult = await this.ghlService.deleteAccount(
+            ghlAccountId || '',
+            ghlLocationId || '',
+          );
+
+          // Update orders with deletion result
+          for (const order of orders) {
+            order.ghlResponse = {
+              ...order.ghlResponse,
+              deleted: true,
+              deletedAt: new Date().toISOString(),
+              deletionResult: deleteResult,
+            };
+            await this.orderRepository.save(order);
+          }
+
+          if (deleteResult.success) {
+            this.logger.log(`GHL account deleted successfully for revoked subscription: ${subscriptionId}`);
+
+            // Clear GHL IDs from customer metadata after successful deletion
+            if (customer) {
+              customer.clearGhlAccount();
+              await this.customerRepository.save(customer);
+              this.logger.log(`GHL account IDs cleared from customer metadata: ${customer.email}`);
+            }
+          } else {
+            this.logger.warn(`GHL account deletion failed: ${deleteResult.message}`);
+          }
+        } catch (error: any) {
+          this.logger.error(`Error deleting GHL account: ${error.message}`);
+          // Don't fail the webhook if GHL deletion fails
+        }
+      } else {
+        this.logger.log(`No GHL account found for revoked subscription: ${subscriptionId}`);
+      }
+
+      return {
+        subscriptionId,
+        status: 'revoked',
+        orderId,
+        customerId,
+        ghlAccountId,
+        ghlLocationId,
+        message: 'Subscription revoked and GHL account deleted',
+      };
+    } catch (error: any) {
+      this.logger.error(`Error handling subscription revocation: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async handleSubscriptionPastDue(data: any): Promise<any> {
@@ -402,6 +606,13 @@ export class WebhooksService {
 
         if (ghlResponse.success) {
           this.logger.log(`GHL account created successfully: ${ghlResponse.accountId}`);
+
+          // Store GHL IDs in customer metadata for future reference (cancellation, etc.)
+          if (ghlResponse.id && ghlResponse.locationId) {
+            customer.setGhlAccount(ghlResponse.id, ghlResponse.locationId);
+            await this.customerRepository.save(customer);
+            this.logger.log(`GHL account IDs stored in customer metadata: ${customer.email}`);
+          }
         } else {
           this.logger.warn(`GHL account creation failed: ${ghlResponse.message}`);
         }
