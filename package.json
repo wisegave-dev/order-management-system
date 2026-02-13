@@ -9,7 +9,8 @@
     "start:dev": "ts-node-dev src/main.ts",
     "build": "tsc",
     "prebuild": "rimraf dist",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "start:prod": "node dist/main.js"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
