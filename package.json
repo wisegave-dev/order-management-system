@@ -1,6 +1,9 @@
 {
   "name": "order-management-system",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev src/main.ts",
@@ -9,7 +12,6 @@
     "postinstall": "npm run build"
   },
   "dependencies": {
-    "@getbrevo/brevo": "^3.0.1",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.12",
     "@nestjs/config": "^4.0.2",

@@ -10,6 +10,7 @@ services:
         value: production
       - key: PORT
         value: 3000
+      # Database Configuration (from Render database)
       - key: DB_HOST
         fromDatabase:
           name: order-management-db
@@ -30,6 +31,19 @@ services:
         fromDatabase:
           name: order-management-db
           property: database
+      # Polar Webhook Configuration (REQUIRED - add your values)
+      - key: POLAR_WEBHOOK_SECRET
+        sync: false
+      # GoHighLevel API Configuration (REQUIRED - add your values)
+      - key: GHL_API_KEY
+        sync: false
+      - key: GHL_AGENCY_ID
+        sync: false
+      - key: GHL_COMPANY_ID
+        sync: false
+      # Email Configuration (REQUIRED - add your values)
+      - key: SMTP_API_KEY
+        sync: false
     healthCheckPath: /health
 
 databases:
