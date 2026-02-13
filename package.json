@@ -5,7 +5,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node dist/src/main.js",
+    "start": "node dist/main.js",
     "start:dev": "ts-node-dev src/main.ts",
     "build": "tsc",
     "prebuild": "rimraf dist",
