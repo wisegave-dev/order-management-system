@@ -351,7 +351,118 @@ export class WebhooksService {
 
   private async handleSubscriptionUncanceled(data: any): Promise<any> {
     this.logger.log(`Subscription uncanceled: ${data.id}`);
-    return { subscriptionId: data.id, status: 'uncanceled' };
+
+    const subscriptionId = data.id;
+    let customerId: string | null = null;
+
+    try {
+      // Find all orders associated with this subscription
+      const orders = await this.orderRepository.find({
+        where: { polarSubscriptionId: subscriptionId },
+      });
+
+      if (orders.length === 0) {
+        this.logger.warn(`No orders found for uncanceled subscription: ${subscriptionId}`);
+        return { subscriptionId, status: 'uncanceled', message: 'No orders found' };
+      }
+
+      this.logger.log(`Found ${orders.length} order(s) for uncanceled subscription: ${subscriptionId}`);
+
+      // Get the customer from the first order
+      const customer = await this.customerRepository.findOne({
+        where: { id: orders[0].customerId },
+      });
+
+      if (!customer) {
+        this.logger.warn(`Customer not found for subscription: ${subscriptionId}`);
+        return { subscriptionId, status: 'uncanceled', message: 'Customer not found' };
+      }
+
+      customerId = customer.id;
+
+      // Check if GHL account already exists (it shouldn't after cancellation)
+      const existingGhlAccountId = customer.getGhlAccountId();
+      const existingGhlLocationId = customer.getGhlLocationId();
+
+      if (existingGhlAccountId && existingGhlLocationId) {
+        this.logger.log(
+          `GHL account already exists for customer ${customer.email} - skipping recreation`,
+        );
+        return {
+          subscriptionId,
+          status: 'uncanceled',
+          customerId,
+          ghlAccountId: existingGhlAccountId,
+          ghlLocationId: existingGhlLocationId,
+          message: 'GHL account already exists',
+        };
+      }
+
+      // Create a new GHL account since the old one was deleted
+      this.logger.log(`Recreating GHL account for customer: ${customer.email}`);
+
+      try {
+        const ghlResponse = await this.ghlService.createAccountFromOrder(
+          `${customer.firstName} ${customer.lastName}`.trim(),
+          customer.email,
+          customer.metadata?.phone || null,
+          customer.businessName || null,
+        );
+
+        // Update all orders with the new GHL response and reactivate them
+        for (const order of orders) {
+          order.ghlResponse = ghlResponse;
+          order.status = OrderStatus.COMPLETED;
+          order.metadata = {
+            ...order.metadata,
+            subscription_uncanceled_at: new Date().toISOString(),
+          };
+          await this.orderRepository.save(order);
+          this.logger.log(`Order ${order.id} reactivated from CANCELED to COMPLETED`);
+        }
+
+        if (ghlResponse.success) {
+          this.logger.log(`GHL account recreated successfully: ${ghlResponse.accountId}`);
+
+          // Store new GHL IDs in customer metadata
+          if (ghlResponse.id && ghlResponse.locationId) {
+            customer.setGhlAccount(ghlResponse.id, ghlResponse.locationId);
+            await this.customerRepository.save(customer);
+            this.logger.log(
+              `New GHL account IDs stored in customer metadata: ${customer.email}`,
+            );
+          }
+
+          return {
+            subscriptionId,
+            status: 'uncanceled',
+            customerId,
+            ghlAccountId: ghlResponse.id,
+            ghlLocationId: ghlResponse.locationId,
+            message: 'Subscription uncanceled, GHL account recreated, and orders reactivated',
+          };
+        } else {
+          this.logger.warn(`GHL account recreation failed: ${ghlResponse.message}`);
+          return {
+            subscriptionId,
+            status: 'uncanceled',
+            customerId,
+            message: `Subscription uncanceled but GHL account creation failed: ${ghlResponse.message}`,
+          };
+        }
+      } catch (error: any) {
+        this.logger.error(`Failed to recreate GHL account: ${error.message}`);
+        return {
+          subscriptionId,
+          status: 'uncanceled',
+          customerId,
+          message: `Subscription uncanceled but GHL account creation failed: ${error.message}`,
+        };
+      }
+    } catch (error: any) {
+      this.logger.error(`Error handling subscription uncanceled: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   private async handleSubscriptionRevoked(data: any): Promise<any> {

@@ -127,6 +127,14 @@ export class ConfigService {
     return this.configService.get<string>('EMAIL_FROM', 'noreply@yourdomain.com');
   }
 
+  get brevoApiKey(): string {
+    const key = this.configService.get<string>('SMTP_API_KEY');
+    if (!key) {
+      throw new Error('SMTP_API_KEY is required but not defined');
+    }
+    return key;
+  }
+
   // ============================================
   // Helper Methods
   // ============================================
@@ -139,8 +147,7 @@ export class ConfigService {
       'POLAR_WEBHOOK_SECRET',
       'GHL_API_KEY',
       'GHL_AGENCY_ID',
-      'SMTP_USER',
-      'SMTP_PASSWORD',
+      'SMTP_API_KEY',
     ];
 
     const missingVars: string[] = [];

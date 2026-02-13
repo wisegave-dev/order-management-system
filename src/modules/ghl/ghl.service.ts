@@ -1,6 +1,7 @@
 import { Injectable, Logger, HttpException, HttpStatus } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "../config/config.service";
+import { EmailService } from "../email/email.service";
 import { firstValueFrom } from "rxjs";
 import { AxiosResponse } from "axios";
 import {
@@ -76,6 +77,7 @@ export class GhlService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -195,6 +197,23 @@ export class GhlService {
       const userId = userResponse.data?.id || userResponse.data?.userId;
 
       this.logger.log(`Step 2 Success: User created with ID: ${userId}`);
+
+      // Send welcome email
+      const customerName = `${firstName} ${lastName}`.trim();
+      this.logger.log(`Sending welcome email to ${email}...`);
+      const emailResult = await this.emailService.sendWelcomeEmail(
+        customerName,
+        email,
+      );
+
+      if (emailResult.success) {
+        this.logger.log(`Welcome email sent successfully to ${email}`);
+      } else {
+        this.logger.warn(
+          `Failed to send welcome email to ${email}: ${emailResult.message}`,
+        );
+        // Continue even if email fails - account was created successfully
+      }
 
       return {
         success: true,

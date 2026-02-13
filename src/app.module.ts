@@ -7,6 +7,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { GhlModule } from './modules/ghl/ghl.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { GhlModule } from './modules/ghl/ghl.module';
     OrdersModule,
     WebhooksModule,
     GhlModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [],

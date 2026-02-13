@@ -4,10 +4,12 @@ import { GhlService } from './ghl.service';
 import { GhlController } from './ghl.controller';
 import { ConfigModule as AppConfigModule } from '../config/config.module';
 import { ConfigService } from '../config/config.service';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     AppConfigModule,
+    EmailModule,
     HttpModule.registerAsync({
       imports: [AppConfigModule],
       useFactory: (configService: ConfigService) => ({
