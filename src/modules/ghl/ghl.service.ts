@@ -34,44 +34,68 @@ interface GhlUserResponse {
 export class GhlService {
   private readonly logger = new Logger(GhlService.name);
   private readonly defaultPermissions: GhlAccountPermissions = {
-    campaignsEnabled: true,
-    campaignsReadOnly: false,
-    contactsEnabled: true,
-    workflowsEnabled: true,
-    workflowsReadOnly: false,
-    triggersEnabled: true,
-    funnelsEnabled: true,
-    websitesEnabled: true,
-    opportunitiesEnabled: true,
-    dashboardStatsEnabled: true,
-    bulkRequestsEnabled: true,
-    appointmentsEnabled: true,
-    reviewsEnabled: true,
-    onlineListingsEnabled: true,
-    phoneCallEnabled: true,
-    conversationsEnabled: true,
-    assignedDataOnly: false,
-    adwordsReportingEnabled: false,
-    membershipEnabled: true,
-    facebookAdsReportingEnabled: false,
-    attributionsReportingEnabled: false,
-    settingsEnabled: true,
-    tagsEnabled: true,
-    leadValueEnabled: true,
-    marketingEnabled: true,
-    agentReportingEnabled: true,
-    botService: false,
-    socialPlanner: true,
-    bloggingEnabled: true,
-    invoiceEnabled: true,
-    affiliateManagerEnabled: true,
-    contentAiEnabled: true,
-    refundsEnabled: true,
-    recordPaymentEnabled: true,
-    cancelSubscriptionEnabled: true,
-    paymentsEnabled: true,
-    communitiesEnabled: true,
-    exportPaymentsEnabled: true,
+    // ========== AI EMPLOYEE CORE - ENABLED ==========
+    conversationsEnabled: true, // 2 Way Text & Email, Web Chat, GMB & FB Messenger
+    workflowsEnabled: true, // Workflows
+    triggersEnabled: true, // Triggers
+    phoneCallEnabled: true, // GMB Call Tracking
+
+    // ========== CORE CRM - ENABLED ==========
+    contactsEnabled: true, // CRM
+    opportunitiesEnabled: true, // Opportunities
+    appointmentsEnabled: true, // Calendar
+    dashboardStatsEnabled: true, // All Reporting
+    agentReportingEnabled: true, // All Reporting
+
+    // ========== MARKETING & CAMPAIGNS - ENABLED ==========
+    campaignsEnabled: true, // Email Marketing, Campaigns, SMS & Email Templates
+    marketingEnabled: true, // Marketing features
+    bulkRequestsEnabled: true, // Bulk operations
+
+    // ========== SETTINGS & UTILITIES - ENABLED ==========
+    settingsEnabled: true, // Settings access
+    tagsEnabled: true, // Tags
+    leadValueEnabled: true, // Lead Value
+    contentAiEnabled: true, // Content AI
+    exportPaymentsEnabled: true, // Export payment data
+
+    // ========== FULL ACCESS (READ/WRITE) - ENABLED ==========
+    assignedDataOnly: false, // Full data access (not assigned only)
+    campaignsReadOnly: false, // Full campaign access (not read-only)
+    workflowsReadOnly: false, // Full workflow access (not read-only)
+
+    // ========== FEATURES TO DISABLE ==========
+    // Reputation & Listings
+    reviewsEnabled: false, // Reputation Management
+    onlineListingsEnabled: false, // Online Listings
+
+    // Sales & Funnels
+    funnelsEnabled: false, // Funnels
+    websitesEnabled: false, // Websites
+
+    // Membership & Community
+    membershipEnabled: false, // Memberships
+    communitiesEnabled: false, // Communities
+    socialPlanner: false, // Social Planner
+    bloggingEnabled: false, // Blogs
+
+    // Financial & Payments
+    invoiceEnabled: false, // Invoice
+    paymentsEnabled: false, // Text To Pay, Payments
+    recordPaymentEnabled: false, // Record Payments
+    refundsEnabled: false, // Refunds
+    cancelSubscriptionEnabled: false, // Cancel Subscription
+
+    // Affiliate & Marketing Tools
+    affiliateManagerEnabled: false, // Affiliate Manager
+
+    // Reporting & Ads
+    adwordsReportingEnabled: false, // AdWords Reporting
+    facebookAdsReportingEnabled: false, // Facebook Ads Reporting
+    attributionsReportingEnabled: false, // Attributions Reporting
+
+    // AI & Bot
+    botService: false, // Bot Service
   };
 
   constructor(
